@@ -3,8 +3,8 @@ import requests
 import asyncio
 from telegram import Bot
 from telegram.constants import ParseMode
-
 import urllib.parse
+import yaml  # 新增，用于解析yaml节点配置
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
@@ -52,6 +52,35 @@ def search_github_clash_urls():
         print("GitHub 搜索失败:", e)
         return []
 
+def get_subscription_country_info(url):
+    """尝试下载订阅yaml并解析，提取节点国家或地区名称"""
+    try:
+        res = requests.get(url, timeout=10)
+        if res.status_code != 200:
+            return None
+
+        data = yaml.safe_load(res.text)
+        proxies = data.get("proxies", [])
+        countries = set()
+
+        for proxy in proxies:
+            # 解析节点中的国家或地区信息，字段名可能不同，尝试多种常见字段
+            for key in ("country", "region", "remarks", "remark", "name", "tag"):
+                if key in proxy:
+                    val = proxy[key]
+                    if isinstance(val, str):
+                        countries.add(val)
+                    elif isinstance(val, list):
+                        countries.update(val)
+                    break  # 找到一个就跳过
+        if countries:
+            return ", ".join(sorted(countries))
+        else:
+            return None
+    except Exception as e:
+        print(f"解析节点地区失败：{url}，错误：{e}")
+        return None
+
 async def send_to_telegram(bot_token, channel_id, urls):
     if not urls:
         print("❌ 没有可用节点，跳过推送")
@@ -60,7 +89,13 @@ async def send_to_telegram(bot_token, channel_id, urls):
     text = "🆕 <b>免费节点订阅更新（自动验证）</b>\n\n"
     for i, url in enumerate(urls[:20], start=1):
         safe_url = urllib.parse.quote(url, safe=":/?=&")
-        text += f"👉 <a href=\"{safe_url}\">{url}</a>\n（可长按复制，或粘贴到 Clash / Shadowrocket 导入）\n\n"
+        country_info = get_subscription_country_info(url)
+        if country_info:
+            country_str = f"（节点地区: {country_info}）"
+        else:
+            country_str = ""
+
+        text += f"👉 <a href=\"{safe_url}\">{url}</a> {country_str}\n（可长按复制，或粘贴到 Clash / Shadowrocket 导入）\n\n"
 
     if len(text.encode('utf-8')) > 4000:
         text = text.encode("utf-8")[:4000].decode("utf-8", errors="ignore") + "\n..."
