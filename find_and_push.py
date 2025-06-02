@@ -1,112 +1,71 @@
 import os
 import requests
-import yaml
+from telegram import Bot
 import re
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
-SUBSCRIBE_URL = os.getenv("SUBSCRIBE_URL")  # 多个地址用英文逗号分隔
 
+# 预定义的免费订阅链接列表
+SUBSCRIBE_URLS = [
+    "https://wanmeiwl3.xyz/gywl/4e3979fc330fc6b7806f3dc78a696f10",
+    "https://bestsub.bestrui.ggff.net/share/bestsub/cdcefaa4-1f0d-462e-ba76-627b344989f2/all.yaml",
+    "https://linuxdo.miaoqiqi.me/linuxdo/love",
+    "https://bh.jiedianxielou.workers.dev",
+    "https://raw.githubusercontent.com/mfuu/v2ray/master/clash.yaml",
+    "https://raw.githubusercontent.com/anaer/Sub/main/clash.yaml",
+    "https://raw.githubusercontent.com/ermaozi/get_subscribe/main/subscribe/clash.yml",
+    "https://cdn.jsdelivr.net/gh/vxiaov/free_proxies@main/clash/clash.provider.yaml",
+    "https://freenode.openrunner.net/uploads/20240617-clash.yaml",
+    "https://tt.vg/freeclash",
+    "https://raw.githubusercontent.com/SnapdragonLee/SystemProxy/master/dist/clash_config.yaml"
+]
+
+# 转义 MarkdownV2 特殊字符
 def escape_markdown(text):
-    """
-    转义 MarkdownV2 格式中需要转义的特殊字符
-    """
-    escape_chars = r'_*[]()~`>#+-=|{}.!'
+    escape_chars = r'\_*[]()~`>#+-=|{}.!'
     return re.sub(f'([{re.escape(escape_chars)}])', r'\\\1', text)
 
-def get_nodes_from_yaml(yaml_text):
+def validate_subscription(url):
     try:
-        data = yaml.safe_load(yaml_text)
-        proxies = data.get("proxies", [])
-        nodes = []
-        for proxy in proxies:
-            ptype = proxy.get("type", "未知类型").upper()
-            name = proxy.get("name", "未知节点")
-            server = proxy.get("server", "")
-            port = proxy.get("port", "")
-            if ptype == "VMESS":
-                uuid = proxy.get("uuid", "")
-                alterId = proxy.get("alterId", "")
-                network = proxy.get("network", "")
-                nodes.append(
-                    f"- {ptype} | {name}\n"
-                    f"  服务器: {server}:{port}\n"
-                    f"  UUID: {uuid}\n"
-                    f"  AlterId: {alterId}\n"
-                    f"  网络: {network}"
-                )
-            elif ptype == "TROJAN":
-                password = proxy.get("password", "")
-                nodes.append(
-                    f"- {ptype} | {name}\n"
-                    f"  服务器: {server}:{port}\n"
-                    f"  密码: {password}"
-                )
-            elif ptype == "SS":
-                cipher = proxy.get("cipher", "")
-                password = proxy.get("password", "")
-                nodes.append(
-                    f"- {ptype} | {name}\n"
-                    f"  服务器: {server}:{port}\n"
-                    f"  加密方式: {cipher}\n"
-                    f"  密码: {password}"
-                )
-            else:
-                nodes.append(f"- {ptype} | {name}\n  服务器: {server}:{port}")
-        return nodes
-    except Exception as e:
-        print("解析 YAML 出错:", e)
-        return []
+        res = requests.get(url, timeout=10)
+        if res.status_code == 200 and "proxies" in res.text:
+            return True
+    except:
+        pass
+    return False
 
-def get_nodes():
-    all_nodes = []
-    urls = [url.strip() for url in SUBSCRIBE_URL.split(",") if url.strip()]
-    for url in urls:
-        print(f"拉取订阅：{url}")
-        try:
-            resp = requests.get(url, timeout=15)
-            resp.raise_for_status()
-            preview = resp.text[:200].replace("\n", "\\n")
-            print("内容预览:", preview)
-            nodes = get_nodes_from_yaml(resp.text)
-            all_nodes.extend(nodes)
-        except Exception as e:
-            print(f"订阅抓取失败: {url}\n错误: {e}")
-    return all_nodes
+def send_to_telegram(bot_token, channel_id, urls):
+    if not urls:
+        print("没有可用节点")
+        return
 
-def send_message(bot_token, channel_id, message):
-    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-    payload = {
-        "chat_id": channel_id,
-        "text": escape_markdown(message),
-        "parse_mode": "MarkdownV2"
-    }
+    # 转义所有 URL 防止 Markdown 失败
+    escaped_urls = [escape_markdown(url) for url in urls[:20]]
+    text = "*🆕 免费节点订阅更新：*\n\n" + "\n".join(escaped_urls)
+
+    bot = Bot(token=bot_token)
     try:
-        resp = requests.post(url, json=payload)
-        if resp.ok:
-            print("✅ 消息发送成功")
-        else:
-            print("❌ 消息发送失败:", resp.text)
+        bot.send_message(chat_id=channel_id, text=text, parse_mode="MarkdownV2")
+        print("✅ 推送成功")
     except Exception as e:
-        print("❌ 消息异常:", e)
+        print("❌ 推送失败:", e)
 
 def main():
-    if not (BOT_TOKEN and CHANNEL_ID and SUBSCRIBE_URL):
-        print("环境变量 BOT_TOKEN、CHANNEL_ID 或 SUBSCRIBE_URL 未设置")
+    if not BOT_TOKEN or not CHANNEL_ID:
+        print("环境变量 BOT_TOKEN 或 CHANNEL_ID 未设置")
         return
 
-    nodes = get_nodes()
-    if not nodes:
-        print("没有抓取到任何节点")
-        return
+    print("🔍 正在验证预定义的订阅链接...")
+    valid_urls = [url for url in SUBSCRIBE_URLS if validate_subscription(url)]
+    print(f"✔️ 验证通过链接数: {len(valid_urls)}")
 
-    nodes_message = "\n\n".join(nodes[:10])  # 限制最多推送10条
-    message = (
-        "*🎯 免费 VPN 节点更新（自动）*\n"
-        "以下是从多个订阅中整理的节点（仅展示前 10 个）：\n\n"
-        f"{nodes_message}"
-    )
-    send_message(BOT_TOKEN, CHANNEL_ID, message)
+    with open("valid_links.txt", "w") as f:
+        for link in valid_urls:
+            f.write(link + "\n")
+
+    print("📄 已保存到 valid_links.txt")
+    send_to_telegram(BOT_TOKEN, CHANNEL_ID, valid_urls)
 
 if __name__ == "__main__":
     main()
