@@ -1,0 +1,29 @@
+name: Auto VPN Node Push
+
+on:
+  schedule:
+    - cron: "0 * * * *"  # 每小时执行一次，UTC时间
+  workflow_dispatch:      # 允许手动触发
+
+jobs:
+  push_nodes:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Python 3.x
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run find_and_push.py
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python find_and_push.py
