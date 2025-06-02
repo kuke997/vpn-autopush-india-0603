@@ -3,7 +3,6 @@ import requests
 import asyncio
 import yaml
 from telegram import Bot
-from telegram.constants import ParseMode
 import urllib.parse
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -53,36 +52,26 @@ def search_github_clash_urls():
         return []
 
 def get_subscription_country_info(url):
-    """下载订阅yaml并解析，只提取节点的country或region字段，返回不重复国家列表字符串"""
     try:
         res = requests.get(url, timeout=10)
         if res.status_code != 200:
             return None
-
         data = yaml.safe_load(res.text)
         proxies = data.get("proxies", [])
         countries = set()
-
         for proxy in proxies:
             country = proxy.get("country")
             if country and isinstance(country, str) and len(country) <= 5:
                 countries.add(country.strip())
                 continue
-
             region = proxy.get("region")
             if region and isinstance(region, str) and len(region) <= 5:
                 countries.add(region.strip())
                 continue
-
-            # 备用：用name字段前2个字母作为简写
             name = proxy.get("name") or proxy.get("remark") or proxy.get("remarks")
             if name and isinstance(name, str) and len(name) >= 2:
                 countries.add(name[:2].strip())
-
-        if countries:
-            return ", ".join(sorted(countries))
-        else:
-            return None
+        return ", ".join(sorted(countries)) if countries else None
     except Exception as e:
         print(f"解析节点地区失败：{url}，错误：{e}")
         return None
@@ -92,23 +81,41 @@ async def send_to_telegram(bot_token, channel_id, urls):
         print("❌ 没有可用节点，跳过推送")
         return
 
-    text = "🆕 <b>2025年最新Clash订阅节点 免费vpn节点Clash/V2Ray/Shadowsocks/Vmess订阅更新 适合翻墙科学上网、免费高速V2Ray节点推荐节点订阅</b>\n\n"
-    for i, url in enumerate(urls[:20], start=1):
+    # 只发送前3条
+    urls = urls[:3]
+
+    text = (
+        "🚀 <b>Best Free VPN for India 2025 — Access Blocked Sites with Clash, V2Ray & Shadowsocks!</b>\n\n"
+        "🔥 Use these 100% working free VPN subscription links to bypass internet censorship in India. "
+        "These links support Clash, Shadowrocket, V2Ray, and allow high-speed secure access to YouTube, Telegram, Pornhub, Twitter, etc.\n\n"
+    )
+
+    for i, url in enumerate(urls, start=1):
         country_info = get_subscription_country_info(url)
         if country_info:
-            country_info = f"（节点地区: {country_info}）"
+            country_info = f" (Locations: {country_info})"
         else:
             country_info = ""
-
         safe_url = urllib.parse.quote(url, safe=":/?=&")
-        text += f"👉 <a href=\"{safe_url}\">{url}</a> {country_info}\n（可长按复制，或粘贴到 Clash / Shadowrocket 导入）\n\n"
+        text += f"🔗 <a href=\"{safe_url}\">VPN Link {i}</a>{country_info}\n"
 
-    if len(text.encode('utf-8')) > 4000:
+    text += (
+        "\n💡 Copy and paste the link into Clash, V2RayN or Shadowrocket.\n"
+        "📡 Updated daily. Join our Telegram channel for more: <b>@vpnfreejiedian</b>\n"
+        "#FreeVPN #IndiaVPN #UnblockIndia #Clash #V2Ray #TelegramVPN"
+    )
+
+    if len(text.encode("utf-8")) > 4000:
         text = text.encode("utf-8")[:4000].decode("utf-8", errors="ignore") + "\n..."
 
     bot = Bot(token=bot_token)
     try:
-        await bot.send_message(chat_id=channel_id, text=text, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+        await bot.send_message(
+            chat_id=channel_id,
+            text=text,
+            parse_mode="HTML",  # 避免 ParseMode 引入
+            disable_web_page_preview=True
+        )
         print("✅ 推送成功")
     except Exception as e:
         print("❌ 推送失败:", e)
@@ -122,7 +129,7 @@ async def main():
     valid_static = [url for url in STATIC_SUBSCRIBE_URLS if validate_subscription(url)]
 
     github_links = search_github_clash_urls()
-    print("🔍 验证GitHub搜索到的订阅链接...")
+    print("🔍 验证 GitHub 搜索到的订阅链接...")
     valid_dynamic = [url for url in github_links if validate_subscription(url)]
 
     all_valid = valid_static + valid_dynamic
