@@ -1,12 +1,13 @@
 import os
 import requests
+import asyncio
 from telegram import Bot
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
-PREDEFINED_URLS = [
+# 免费订阅源（可手动补充）
+STATIC_SUBSCRIBE_URLS = [
     "https://wanmeiwl3.xyz/gywl/4e3979fc330fc6b7806f3dc78a696f10",
     "https://bestsub.bestrui.ggff.net/share/bestsub/cdcefaa4-1f0d-462e-ba76-627b344989f2/all.yaml",
     "https://linuxdo.miaoqiqi.me/linuxdo/love",
@@ -20,42 +21,6 @@ PREDEFINED_URLS = [
     "https://raw.githubusercontent.com/SnapdragonLee/SystemProxy/master/dist/clash_config.yaml"
 ]
 
-HEADERS = {
-    "Accept": "application/vnd.github+json",
-    "User-Agent": "AutoFreeVPNBot"
-}
-
-if GITHUB_TOKEN:
-    HEADERS["Authorization"] = f"token {GITHUB_TOKEN}"
-
-def github_search_subscribe_files(query="clash.yaml", max_pages=2):
-    print("🔍 GitHub 搜索订阅文件中...")
-    discovered_urls = set()
-
-    for page in range(1, max_pages + 1):
-        params = {
-            "q": query + " in:path",
-            "per_page": 30,
-            "page": page,
-        }
-        try:
-            resp = requests.get("https://api.github.com/search/code", headers=HEADERS, params=params, timeout=15)
-            resp.raise_for_status()
-            results = resp.json().get("items", [])
-            if not results:
-                break
-            for item in results:
-                repo = item["repository"]["full_name"]
-                path = item["path"]
-                raw_url = f"https://raw.githubusercontent.com/{repo}/main/{path}"
-                discovered_urls.add(raw_url)
-        except Exception as e:
-            print(f"GitHub 搜索异常: {e}")
-            break
-
-    print(f"✨ GitHub 搜索到 {len(discovered_urls)} 个可能的订阅链接")
-    return list(discovered_urls)
-
 def validate_subscription(url):
     try:
         res = requests.get(url, timeout=10)
@@ -65,39 +30,60 @@ def validate_subscription(url):
         pass
     return False
 
-def send_to_telegram(bot_token, channel_id, urls):
+def search_github_clash_urls():
+    print("🔍 GitHub 搜索订阅文件中...")
+    try:
+        headers = {
+            "Accept": "application/vnd.github.v3.text-match+json"
+        }
+        query = "clash filename:clash.yaml in:path extension:yaml"
+        url = f"https://api.github.com/search/code?q={query}&per_page=100"
+        res = requests.get(url, headers=headers, timeout=15)
+        items = res.json().get("items", [])
+        links = []
+        for item in items:
+            raw_url = item["html_url"].replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
+            links.append(raw_url)
+        print(f"✨ GitHub 搜索到 {len(links)} 个可能的订阅链接")
+        return links
+    except Exception as e:
+        print("GitHub 搜索失败:", e)
+        return []
+
+async def send_to_telegram(bot_token, channel_id, urls):
     if not urls:
-        print("没有可用节点，跳过推送")
+        print("❌ 没有可用节点，跳过推送")
         return
     text = "*🆕 免费节点订阅更新（含GitHub搜索）*:\n\n" + "\n".join(urls[:20])
     bot = Bot(token=bot_token)
     try:
-        bot.send_message(chat_id=channel_id, text=text, parse_mode="Markdown")
+        await bot.send_message(chat_id=channel_id, text=text, parse_mode="Markdown")
         print("✅ 推送成功")
     except Exception as e:
         print("❌ 推送失败:", e)
+    await bot.session.close()
 
-def main():
+async def main():
     if not BOT_TOKEN or not CHANNEL_ID:
         print("环境变量 BOT_TOKEN 或 CHANNEL_ID 未设置")
         return
 
     print("🔍 验证预定义订阅链接...")
-    valid_urls = [url for url in PREDEFINED_URLS if validate_subscription(url)]
+    valid_static = [url for url in STATIC_SUBSCRIBE_URLS if validate_subscription(url)]
 
-    github_urls = github_search_subscribe_files()
+    github_links = search_github_clash_urls()
     print("🔍 验证GitHub搜索到的订阅链接...")
-    valid_github_urls = [url for url in github_urls if validate_subscription(url)]
+    valid_dynamic = [url for url in github_links if validate_subscription(url)]
 
-    all_valid_urls = list(set(valid_urls + valid_github_urls))
+    all_valid = valid_static + valid_dynamic
+    print(f"✔️ 共验证通过的有效订阅链接数量: {len(all_valid)}")
 
-    print(f"✔️ 共验证通过的有效订阅链接数量: {len(all_valid_urls)}")
     with open("valid_links.txt", "w") as f:
-        for link in all_valid_urls:
+        for link in all_valid:
             f.write(link + "\n")
     print("📄 已保存到 valid_links.txt")
 
-    send_to_telegram(BOT_TOKEN, CHANNEL_ID, all_valid_urls)
+    await send_to_telegram(BOT_TOKEN, CHANNEL_ID, all_valid)
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
