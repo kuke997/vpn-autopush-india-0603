@@ -101,7 +101,7 @@ async def send_to_telegram(bot_token, channel_id, urls):
 
     text += (
         "\n💡 Copy and paste the link into Clash, V2RayN or Shadowrocket.\n"
-        "📡 Updated daily. Join our Telegram channel for more: <b>@vpnfreejiedian</b>\n"
+        "📡 Updated daily. Join our Telegram channel for more: <b>@@vpn4india</b>\n"
         "#FreeVPN #IndiaVPN #UnblockIndia #Clash #V2Ray #TelegramVPN"
     )
 
