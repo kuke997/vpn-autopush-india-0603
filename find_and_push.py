@@ -2,11 +2,12 @@ import os
 import requests
 import asyncio
 from telegram import Bot
+import html
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
 
-# 免费订阅源（可手动补充）
+# 免费订阅链接（你可以继续添加）
 STATIC_SUBSCRIBE_URLS = [
     "https://wanmeiwl3.xyz/gywl/4e3979fc330fc6b7806f3dc78a696f10",
     "https://bestsub.bestrui.ggff.net/share/bestsub/cdcefaa4-1f0d-462e-ba76-627b344989f2/all.yaml",
@@ -54,14 +55,20 @@ async def send_to_telegram(bot_token, channel_id, urls):
     if not urls:
         print("❌ 没有可用节点，跳过推送")
         return
-    text = "*🆕 免费节点订阅更新（含GitHub搜索）*:\n\n" + "\n".join(urls[:20])
+
+    # 使用 HTML 格式避免 Markdown 错误
+    safe_links = [f"<code>{html.escape(url)}</code>" for url in urls[:20]]
+    text = "<b>🆕 免费节点订阅更新（自动验证）</b>\n\n" + "\n".join(safe_links)
+
+    if len(text.encode('utf-8')) > 4000:
+        text = text.encode("utf-8")[:4000].decode("utf-8", errors="ignore") + "\n..."
+
     bot = Bot(token=bot_token)
     try:
-        await bot.send_message(chat_id=channel_id, text=text, parse_mode="Markdown")
+        await bot.send_message(chat_id=channel_id, text=text, parse_mode="HTML", disable_web_page_preview=True)
         print("✅ 推送成功")
     except Exception as e:
         print("❌ 推送失败:", e)
-    await bot.session.close()
 
 async def main():
     if not BOT_TOKEN or not CHANNEL_ID:
