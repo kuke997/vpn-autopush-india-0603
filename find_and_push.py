@@ -4,9 +4,8 @@ from telegram import Bot
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")  # 建议设置以避免API限流
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
-# 预定义免费订阅链接
 PREDEFINED_URLS = [
     "https://wanmeiwl3.xyz/gywl/4e3979fc330fc6b7806f3dc78a696f10",
     "https://bestsub.bestrui.ggff.net/share/bestsub/cdcefaa4-1f0d-462e-ba76-627b344989f2/all.yaml",
@@ -30,10 +29,6 @@ if GITHUB_TOKEN:
     HEADERS["Authorization"] = f"token {GITHUB_TOKEN}"
 
 def github_search_subscribe_files(query="clash.yaml", max_pages=2):
-    """
-    通过GitHub搜索API，自动发现含clash订阅的yaml文件Raw链接。
-    搜索关键词可调整，比如 'clash.yaml', 'subscribe.yaml', 'proxy.yaml'
-    """
     print("🔍 GitHub 搜索订阅文件中...")
     discovered_urls = set()
 
@@ -50,10 +45,8 @@ def github_search_subscribe_files(query="clash.yaml", max_pages=2):
             if not results:
                 break
             for item in results:
-                # 解析raw文件地址
                 repo = item["repository"]["full_name"]
                 path = item["path"]
-                # GitHub raw文件链接格式
                 raw_url = f"https://raw.githubusercontent.com/{repo}/main/{path}"
                 discovered_urls.add(raw_url)
         except Exception as e:
@@ -89,16 +82,13 @@ def main():
         print("环境变量 BOT_TOKEN 或 CHANNEL_ID 未设置")
         return
 
-    # 1. 验证预定义的链接
     print("🔍 验证预定义订阅链接...")
     valid_urls = [url for url in PREDEFINED_URLS if validate_subscription(url)]
 
-    # 2. GitHub自动搜索并验证
     github_urls = github_search_subscribe_files()
     print("🔍 验证GitHub搜索到的订阅链接...")
     valid_github_urls = [url for url in github_urls if validate_subscription(url)]
 
-    # 合并去重
     all_valid_urls = list(set(valid_urls + valid_github_urls))
 
     print(f"✔️ 共验证通过的有效订阅链接数量: {len(all_valid_urls)}")
@@ -107,7 +97,6 @@ def main():
             f.write(link + "\n")
     print("📄 已保存到 valid_links.txt")
 
-    # 推送到Telegram频道
     send_to_telegram(BOT_TOKEN, CHANNEL_ID, all_valid_urls)
 
 if __name__ == "__main__":
