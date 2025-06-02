@@ -1,0 +1,27 @@
+name: Auto Scan & Push Free VPN
+
+on:
+  schedule:
+    - cron: "0 * * * *"  # 每小时 UTC 时间运行一次
+  workflow_dispatch:
+
+jobs:
+  scan_and_push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run script
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
+        run: python find_and_push.py
