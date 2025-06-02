@@ -32,7 +32,7 @@ def validate_subscription(url):
     return False
 
 def search_github_clash_urls():
-    print("🔍 GitHub 搜索订阅文件中...")
+    print("🔍 Searching GitHub for subscription files...")
     try:
         headers = {
             "Accept": "application/vnd.github.v3.text-match+json"
@@ -45,10 +45,10 @@ def search_github_clash_urls():
         for item in items:
             raw_url = item["html_url"].replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
             links.append(raw_url)
-        print(f"✨ GitHub 搜索到 {len(links)} 个可能的订阅链接")
+        print(f"✨ Found {len(links)} potential links.")
         return links
     except Exception as e:
-        print("GitHub 搜索失败:", e)
+        print("GitHub search failed:", e)
         return []
 
 def get_subscription_country_info(url):
@@ -73,36 +73,36 @@ def get_subscription_country_info(url):
                 countries.add(name[:2].strip())
         return ", ".join(sorted(countries)) if countries else None
     except Exception as e:
-        print(f"解析节点地区失败：{url}，错误：{e}")
+        print(f"Failed to parse regions from: {url}, error: {e}")
         return None
 
 async def send_to_telegram(bot_token, channel_id, urls):
     if not urls:
-        print("❌ 没有可用节点，跳过推送")
+        print("❌ No valid links found.")
         return
 
-    # 只发送前3条
-    urls = urls[:3]
+    urls = urls[:3]  # Only send top 3
 
     text = (
-        "🚀 <b>Best Free VPN for India 2025 — Access Blocked Sites with Clash, V2Ray & Shadowsocks!</b>\n\n"
-        "🔥 Use these 100% working free VPN subscription links to bypass internet censorship in India. "
-        "These links support Clash, Shadowrocket, V2Ray, and allow high-speed secure access to YouTube, Telegram, Pornhub, Twitter, etc.\n\n"
+        "🌍 <b>Top 3 Free VPNs for India (2025)</b>\n"
+        "🔓 <b>Bypass website blocks and censorship with Clash, V2Ray, and Shadowsocks!</b>\n\n"
+        "🇮🇳 Perfect for accessing YouTube, Telegram, X (Twitter), Pornhub, and more.\n"
+        "✅ No registration required — fast, secure, and anonymous.\n\n"
     )
 
     for i, url in enumerate(urls, start=1):
         country_info = get_subscription_country_info(url)
         if country_info:
-            country_info = f" (Locations: {country_info})"
+            country_info = f" (Location: {country_info})"
         else:
             country_info = ""
         safe_url = urllib.parse.quote(url, safe=":/?=&")
         text += f"🔗 <a href=\"{safe_url}\">VPN Link {i}</a>{country_info}\n"
 
     text += (
-        "\n💡 Copy and paste the link into Clash, V2RayN or Shadowrocket.\n"
-        "📡 Updated daily. Join our Telegram channel for more: <b>@@vpn4india</b>\n"
-        "#FreeVPN #IndiaVPN #UnblockIndia #Clash #V2Ray #TelegramVPN"
+        "\n📲 Copy & paste into Clash, Shadowrocket or V2RayN.\n"
+        "🕒 Updated daily. Follow our Telegram for latest free VPNs: <a href=\"https://t.me/vpn4india\">@vpn4india</a>\n\n"
+        "#IndiaVPN #FreeVPN #ClashVPN #V2Ray #UnblockIndia #TelegramVPN"
     )
 
     if len(text.encode("utf-8")) > 4000:
@@ -113,32 +113,32 @@ async def send_to_telegram(bot_token, channel_id, urls):
         await bot.send_message(
             chat_id=channel_id,
             text=text,
-            parse_mode="HTML",  # 避免 ParseMode 引入
+            parse_mode="HTML",
             disable_web_page_preview=True
         )
-        print("✅ 推送成功")
+        print("✅ Sent successfully.")
     except Exception as e:
-        print("❌ 推送失败:", e)
+        print("❌ Failed to send message:", e)
 
 async def main():
     if not BOT_TOKEN or not CHANNEL_ID:
-        print("环境变量 BOT_TOKEN 或 CHANNEL_ID 未设置")
+        print("BOT_TOKEN or CHANNEL_ID environment variables not set.")
         return
 
-    print("🔍 验证预定义订阅链接...")
+    print("🔍 Validating static subscription links...")
     valid_static = [url for url in STATIC_SUBSCRIBE_URLS if validate_subscription(url)]
 
     github_links = search_github_clash_urls()
-    print("🔍 验证 GitHub 搜索到的订阅链接...")
+    print("🔍 Validating GitHub-discovered subscription links...")
     valid_dynamic = [url for url in github_links if validate_subscription(url)]
 
     all_valid = valid_static + valid_dynamic
-    print(f"✔️ 共验证通过的有效订阅链接数量: {len(all_valid)}")
+    print(f"✔️ Total valid links: {len(all_valid)}")
 
     with open("valid_links.txt", "w") as f:
         for link in all_valid:
             f.write(link + "\n")
-    print("📄 已保存到 valid_links.txt")
+    print("📄 Saved to valid_links.txt")
 
     await send_to_telegram(BOT_TOKEN, CHANNEL_ID, all_valid)
 
