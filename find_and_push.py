@@ -92,7 +92,7 @@ async def send_to_telegram(bot_token, channel_id, urls):
         print("❌ 没有可用节点，跳过推送")
         return
 
-    text = "🆕 <b>免费vpn节点Clash/V2Ray/Shadowsocks/Vmess订阅更新（自动验证）</b>\n\n"
+    text = "🆕 <b>免费vpn节点Clash/V2Ray/Shadowsocks/Vmess订阅更新 适合翻墙科学上网、节点订阅</b>\n\n"
     for i, url in enumerate(urls[:20], start=1):
         country_info = get_subscription_country_info(url)
         if country_info:
