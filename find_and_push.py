@@ -3,6 +3,7 @@ import requests
 import asyncio
 from telegram import Bot
 from telegram.constants import ParseMode
+
 import urllib.parse
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -32,7 +33,7 @@ def validate_subscription(url):
     return False
 
 def search_github_clash_urls():
-    print("\U0001F50D GitHub 搜索订阅文件中...")
+    print("🔍 GitHub 搜索订阅文件中...")
     try:
         headers = {
             "Accept": "application/vnd.github.v3.text-match+json"
@@ -56,11 +57,10 @@ async def send_to_telegram(bot_token, channel_id, urls):
         print("❌ 没有可用节点，跳过推送")
         return
 
-    text = "\U0001F195 <b>免费节点订阅更新（自动验证）</b>\n\n"
+    text = "🆕 <b>免费节点订阅更新（自动验证）</b>\n\n"
     for i, url in enumerate(urls[:20], start=1):
-        encoded = urllib.parse.quote(url, safe="")
-        clash_url = f"clash://install-config?url={encoded}"
-        text += f"👉 <a href=\"{clash_url}\">订阅{i}</a>\n"
+        safe_url = urllib.parse.quote(url, safe=":/?=&")
+        text += f"👉 <a href=\"{safe_url}\">{url}</a>\n（可长按复制，或粘贴到 Clash / Shadowrocket 导入）\n\n"
 
     if len(text.encode('utf-8')) > 4000:
         text = text.encode("utf-8")[:4000].decode("utf-8", errors="ignore") + "\n..."
@@ -77,11 +77,11 @@ async def main():
         print("环境变量 BOT_TOKEN 或 CHANNEL_ID 未设置")
         return
 
-    print("\U0001F50D 验证预定义订阅链接...")
+    print("🔍 验证预定义订阅链接...")
     valid_static = [url for url in STATIC_SUBSCRIBE_URLS if validate_subscription(url)]
 
     github_links = search_github_clash_urls()
-    print("\U0001F50D 验证GitHub搜索到的订阅链接...")
+    print("🔍 验证GitHub搜索到的订阅链接...")
     valid_dynamic = [url for url in github_links if validate_subscription(url)]
 
     all_valid = valid_static + valid_dynamic
