@@ -83,13 +83,7 @@ async def send_to_telegram(bot_token, channel_id, urls):
 
     urls = urls[:3]  # Only send top 3
 
-    text = (
-        "🌍 <b>Top 3 Free VPNs for India (2025)</b>\n"
-        "🔓 <b>Bypass website blocks and censorship with Clash, V2Ray, and Shadowsocks!</b>\n\n"
-        "🇮🇳 Perfect for accessing YouTube, Telegram, X (Twitter), Pornhub, and more.\n"
-        "✅ No registration required — fast, secure, and anonymous.\n\n"
-    )
-
+    link_lines = ""
     for i, url in enumerate(urls, start=1):
         country_info = get_subscription_country_info(url)
         if country_info:
@@ -97,22 +91,40 @@ async def send_to_telegram(bot_token, channel_id, urls):
         else:
             country_info = ""
         safe_url = urllib.parse.quote(url, safe=":/?=&")
-        text += f"🔗 <a href=\"{safe_url}\">VPN Link {i}</a>{country_info}\n"
+        link_lines += f"🔗 <a href=\"{safe_url}\">VPN Link {i}</a>{country_info}\n"
 
-    text += (
-        "\n📲 Copy & paste into Clash, Shadowrocket or V2RayN.\n"
-        "🕒 Updated daily. Follow our Telegram for latest free VPNs: <a href=\"https://t.me/vpn4india\">@vpn4india</a>\n\n"
+    text_en = (
+        "🌍 <b>Top 3 Free VPNs for India (2025)</b>\n"
+        "🔓 <b>Unblock websites, apps, and videos using Clash, V2Ray, and Shadowsocks!</b>\n\n"
+        "🇮🇳 Perfect for YouTube, Telegram, X (Twitter), Pornhub, and more.\n"
+        "✅ No signup needed – fast, safe, and anonymous.\n\n"
+        f"{link_lines}\n"
+        "📲 Use these links in Clash, Shadowrocket, or V2RayN.\n"
+        "🕒 Updated every day. Join our Telegram for latest free VPNs: <a href=\"https://t.me/vpn4india\">@vpn4india</a>\n\n"
         "#IndiaVPN #FreeVPN #ClashVPN #V2Ray #UnblockIndia #TelegramVPN"
     )
 
-    if len(text.encode("utf-8")) > 4000:
-        text = text.encode("utf-8")[:4000].decode("utf-8", errors="ignore") + "\n..."
+    text_hi = (
+        "🌍 <b>भारत के लिए टॉप 3 फ्री VPNs (2025)</b>\n"
+        "🔓 <b>Clash, V2Ray और Shadowsocks की मदद से वेबसाइट और ऐप्स का अनब्लॉक करें!</b>\n\n"
+        "🇮🇳 YouTube, Telegram, X (Twitter), Pornhub और अन्य साइट्स के लिए परफेक्ट।\n"
+        "✅ बिना रजिस्ट्रेशन – तेज़, सुरक्षित और गुमनाम।\n\n"
+        f"{link_lines}\n"
+        "📲 इन लिंक्स को Clash, Shadowrocket, या V2RayN में इस्तेमाल करें।\n"
+        "🕒 हर दिन अपडेट होता है। लेटेस्ट फ्री VPNs के लिए हमारा Telegram चैनल जॉइन करें: <a href=\"https://t.me/vpn4india\">@vpn4india</a>\n\n"
+        "#IndiaVPN #FreeVPN #ClashVPN #V2Ray #UnblockIndia #TelegramVPN"
+    )
+
+    final_text = text_en + "\n\n" + text_hi
+
+    if len(final_text.encode("utf-8")) > 4000:
+        final_text = final_text.encode("utf-8")[:4000].decode("utf-8", errors="ignore") + "\n..."
 
     bot = Bot(token=bot_token)
     try:
         await bot.send_message(
             chat_id=channel_id,
-            text=text,
+            text=final_text,
             parse_mode="HTML",
             disable_web_page_preview=True
         )
