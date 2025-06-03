@@ -4,6 +4,7 @@ import asyncio
 import yaml
 from telegram import Bot
 import urllib.parse
+import re
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
@@ -51,6 +52,16 @@ def search_github_clash_urls():
         print("GitHub search failed:", e)
         return []
 
+# 只保留 emoji 和英文
+def clean_country_info(text):
+    if not text:
+        return None
+    emoji_pattern = re.compile("[\U0001F1E6-\U0001F1FF]{2}")
+    english_pattern = re.compile(r'[A-Za-z]{2,}')
+    emojis = emoji_pattern.findall(text)
+    english = english_pattern.findall(text)
+    return " ".join(emojis + english) if (emojis or english) else None
+
 def get_subscription_country_info(url):
     try:
         res = requests.get(url, timeout=10)
@@ -60,17 +71,12 @@ def get_subscription_country_info(url):
         proxies = data.get("proxies", [])
         countries = set()
         for proxy in proxies:
-            country = proxy.get("country")
-            if country and isinstance(country, str) and len(country) <= 5:
-                countries.add(country.strip())
-                continue
-            region = proxy.get("region")
-            if region and isinstance(region, str) and len(region) <= 5:
-                countries.add(region.strip())
-                continue
-            name = proxy.get("name") or proxy.get("remark") or proxy.get("remarks")
-            if name and isinstance(name, str) and len(name) >= 2:
-                countries.add(name[:2].strip())
+            for key in ["country", "region", "name", "remark", "remarks"]:
+                val = proxy.get(key)
+                if val and isinstance(val, str):
+                    cleaned = clean_country_info(val.strip())
+                    if cleaned:
+                        countries.add(cleaned)
         return ", ".join(sorted(countries)) if countries else None
     except Exception as e:
         print(f"Failed to parse regions from: {url}, error: {e}")
@@ -81,41 +87,25 @@ async def send_to_telegram(bot_token, channel_id, urls):
         print("❌ No valid links found.")
         return
 
-    urls = urls[:3]  # Only send top 3
+    urls = urls[:3]
 
     link_lines = ""
     for i, url in enumerate(urls, start=1):
         country_info = get_subscription_country_info(url)
-        if country_info:
-            country_info = f" (Location: {country_info})"
-        else:
-            country_info = ""
+        country_text = f" (🌐 {country_info})" if country_info else ""
         safe_url = urllib.parse.quote(url, safe=":/?=&")
-        link_lines += f"🔗 <a href=\"{safe_url}\">VPN Link {i}</a>{country_info}\n"
+        link_lines += f"🔗 <a href=\"{safe_url}\">VPN Link {i}</a>{country_text}\n"
 
-    text_en = (
-        "🌍 <b>Top 3 Free VPNs for India (2025)</b>\n"
-        "🔓 <b>Unblock websites, apps, and videos using Clash, V2Ray, and Shadowsocks!</b>\n\n"
-        "🇮🇳 Perfect for YouTube, Telegram, X (Twitter), Pornhub, and more.\n"
-        "✅ No signup needed – fast, safe, and anonymous.\n\n"
+    final_text = (
+        "🌍 <b>भारत 🇮🇳 के लिए बेस्ट 3 फ्री VPNs (Top 3 Free VPNs for India – 2025)</b>\n"
+        "🔓 <b>Clash, V2Ray और Shadowsocks से वेबसाइट्स और ऐप्स अनब्लॉक करें।</b>\n\n"
+        "📺 YouTube, Telegram, X (Twitter), Pornhub और बाकी सभी साइट्स काम करेंगी!\n"
+        "✅ कोई साइनअप नहीं – Fast, Safe, और Anonymous।\n\n"
         f"{link_lines}\n"
-        "📲 Use these links in Clash, Shadowrocket, or V2RayN.\n"
-        "🕒 Updated every day. Join our Telegram for latest free VPNs: <a href=\"https://t.me/vpn4india\">@vpn4india</a>\n\n"
+        "📲 इन लिंक्स को Clash, Shadowrocket, या V2RayN ऐप में डालें।\n"
+        "🕒 डेली अपडेट। लेटेस्ट फ्री VPNs के लिए हमारा Telegram जॉइन करें: <a href=\"https://t.me/vpn4india\">@vpn4india</a>\n\n"
         "#IndiaVPN #FreeVPN #ClashVPN #V2Ray #UnblockIndia #TelegramVPN"
     )
-
-    text_hi = (
-        "🌍 <b>भारत के लिए टॉप 3 फ्री VPNs (2025)</b>\n"
-        "🔓 <b>Clash, V2Ray और Shadowsocks की मदद से वेबसाइट और ऐप्स का अनब्लॉक करें!</b>\n\n"
-        "🇮🇳 YouTube, Telegram, X (Twitter), Pornhub और अन्य साइट्स के लिए परफेक्ट।\n"
-        "✅ बिना रजिस्ट्रेशन – तेज़, सुरक्षित और गुमनाम।\n\n"
-        f"{link_lines}\n"
-        "📲 इन लिंक्स को Clash, Shadowrocket, या V2RayN में इस्तेमाल करें।\n"
-        "🕒 हर दिन अपडेट होता है। लेटेस्ट फ्री VPNs के लिए हमारा Telegram चैनल जॉइन करें: <a href=\"https://t.me/vpn4india\">@vpn4india</a>\n\n"
-        "#IndiaVPN #FreeVPN #ClashVPN #V2Ray #UnblockIndia #TelegramVPN"
-    )
-
-    final_text = text_en + "\n\n" + text_hi
 
     if len(final_text.encode("utf-8")) > 4000:
         final_text = final_text.encode("utf-8")[:4000].decode("utf-8", errors="ignore") + "\n..."
